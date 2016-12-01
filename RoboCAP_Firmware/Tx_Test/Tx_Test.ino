@@ -1,15 +1,20 @@
-/*
+/* 
  * www.Makerspace-Az.org
+ * by [azerimaker]
+ * ---------------------------------------------------------------------------- 
+ * [az]/([en])
  * Arduino Sketch: Controller (Tx) Test proqrami
- * Kommunikasiya: nRF24L01 2.4GHz
- * son modifikasia tarixi: 18 Sentyabr 2016
- * [azerimaker]
+ * Kommunikasiya (Communication methods): nRF24L01+ / Smartphone + Bluetooth (HC-06)
+ * Son modifikasia (last modified): 1 Dekabr 2016
+ * ----------------------------------------------------------------------------
+ * 
 */
 
-/*-----( Kitabxana elavesi)-----*/
-
+/*----- Lazimi Kitabxanalar (Required Libraries)-----*/
 #include <SPI.h>   
-#include "RF24.h"  // Download and Install 
+#include "RF24.h"  // Download link --> https://github.com/TMRh20/RF24
+
+/*----------------------------------------------------------------------------*/
 
 #define  CE_PIN  8   // The pins to be used for CE and SN
 #define  CSN_PIN 10
@@ -22,8 +27,20 @@
 #define TOP_RIGT_BTN 3
 #define BOTTOM_LEFT_BTN 4
 #define BOTTOM_RIGHT_BTN 5
- // Nokia LCD
 
+// Nokia 5110 LCD (84x48)
+#define RST 6
+#define CE 7
+#define DC 9
+#define DIN 11
+#define CLK 13
+
+/*---------------------LCD Test -------------------------------------------------------*/
+void LcdWriteCmd(byte cmd); 
+void LcdWriteData(byte data);
+void LcdInit(void);
+void LcdTest(void);
+void LcdClear(void);
 
 /*-----( Declare objects )-----*/
 /* Hardware configuration: Set up nRF24L01 radio on SPI bus plus (usually) pins 7 & 8 (Can be changed) */
@@ -36,6 +53,7 @@ unsigned long timeNow;  // Used to grab the current time, calculate delays
 unsigned long started_waiting_at;
 boolean timeout;       // Timeout? True or False
 boolean debugMode = false; 
+
 
 struct dataStruct {
   unsigned long micro_sec;  // to save response times
@@ -58,6 +76,13 @@ void setup()
   pinMode(TOP_RIGT_BTN, INPUT_PULLUP);
   pinMode(BOTTOM_LEFT_BTN, INPUT_PULLUP);
   pinMode(BOTTOM_RIGHT_BTN, INPUT_PULLUP);
+
+  
+  LcdInit();
+  LcdClear();
+  LcdTest();
+  delay(3000);
+  LcdClear();
 
   radio.begin();          // Initialize the nRF24L01 Radio
   radio.setChannel(108);  // Above most WiFi frequencies
@@ -146,9 +171,101 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
     Serial.print(F(", Round-trip delay "));
     Serial.print(timeNow - myData.micro_sec);
     Serial.println(F(" microseconds "));
-
   }
   delay(10);
 }
+
+
+
+void LcdInit(void)
+{
+  pinMode(RST, OUTPUT);
+  pinMode(CE, OUTPUT);
+  pinMode(DC, OUTPUT);
+  pinMode(DIN, OUTPUT);
+  pinMode(CLK, OUTPUT);
+  digitalWrite(RST, LOW);   // active low
+  digitalWrite(RST, HIGH); 
+}
+
+
+void LcdTest(void)
+{
+  digitalWrite(DC, LOW); //DC pin is low for commands
+  LcdWriteCmd(0x21); // LCD extended commands
+  LcdWriteCmd(0xB8); // set LCD Vop (contrast)
+  //LcdWriteCmd(0x20); // LCD normal commands
+  LcdWriteCmd(0x04); // set temp coefficent
+  LcdWriteCmd(0x14); // LCD bias mode 1:40
+  LcdWriteCmd(0x20); // LCD basic commands
+  LcdWriteCmd(0x09); // LCD all segments on
+  LcdWriteCmd(0x0C); // display control set, normal video mode
+  
+  for(int i = 0; i < 42; i++)
+  {
+      LcdWriteData(0xAA); // AA, 55
+      delay(50);
+      LcdWriteData(0x55);
+  }
+  for(int i = 0; i < 42; i++)
+  {
+      LcdWriteData(0xFF); 
+      delay(50);
+      LcdWriteData(0x00);
+  }
+  for(int i = 0; i < 42; i++)
+  {
+      LcdWriteData(0xAA); // AA, 55
+      delay(50);
+      LcdWriteData(0x55);
+  }
+  for(int i = 0; i < 42; i++)
+  {
+      LcdWriteData(0xFF); 
+      delay(50);
+      LcdWriteData(0x00);
+  }
+  for(int i = 0; i < 42; i++)
+  {
+      LcdWriteData(0xAA); 
+      delay(50);
+      LcdWriteData(0x55);
+  }
+  
+  for(int i = 0; i < 42; i++)
+  {
+      LcdWriteData(0xFF); 
+      delay(50);
+      LcdWriteData(0x00);
+  }
+}
+
+
+void LcdClear(void)
+{
+  for (int index = 0; index < 84 * 48 / 8; index++)
+  {
+    LcdWriteData(0x00);
+  }
+}
+
+
+void LcdWriteCmd(byte cmd)
+{
+digitalWrite(DC, LOW); //DC pin is low for commands
+digitalWrite(CE, LOW); // active low
+shiftOut(DIN, CLK, MSBFIRST, cmd); //transmit serial data
+digitalWrite(CE, HIGH);
+}
+
+void LcdWriteData(byte data)
+{
+digitalWrite(DC, HIGH);     //DC pin is high for data
+digitalWrite(CE, LOW);      // active low
+shiftOut(DIN, CLK, MSBFIRST, data); //transmit serial data
+digitalWrite(CE, HIGH);
+}
+
+
 
 
