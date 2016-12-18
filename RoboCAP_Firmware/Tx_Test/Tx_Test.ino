@@ -19,8 +19,8 @@
 #define  CE_PIN  8   // The pins to be used for CE and SN
 #define  CSN_PIN 10
 
-#define JOYSTICK_X   A1  // The Joystick potentiometers connected to Arduino Analog inputs
-#define JOYSTICK_Y   A0
+#define JOYSTICK_X   A0  // The Joystick potentiometers connected to Arduino Analog inputs
+#define JOYSTICK_Y   A1
 #define JOYSTICK_SW  A2  // The Joystick push-down switch, will be used as a Digital input
 
 #define TOP_LEFT_BTN A6
