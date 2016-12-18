@@ -54,6 +54,7 @@ void setup()
   // Start the radio listening for data
   radio.startListening();
 //  radio.printDetails(); //Uncomment to show LOTS of debugging information
+  Serial.println("RoboCAP Rx Test Started...");
 }
 
 
