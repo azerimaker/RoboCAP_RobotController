@@ -1,5 +1,5 @@
 # RoboCAP_RobotController
-ATmega328 based Robot Remote Controller and Receiver Circuit.
+ATmega328 based Robot Remote Controller and Receiver Circuit. [Read more.](http://makerspace-az.org/az/elektronika/robocap-v-1-0-robot-controller/)
 
 
 ![RoboCAP](https://raw.githubusercontent.com/condorxan/RoboCAP_RobotController/master/RoboCAP_Media/robocap-v1.0-complete.jpg)
