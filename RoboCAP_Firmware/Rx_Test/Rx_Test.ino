@@ -20,10 +20,10 @@ RF24 radio(CE_PIN, CSN_PIN);
 
 /*-----( Declare Variables )-----*/
 byte addresses[][6] = {"1Node", "2Node"}; // These will be the names of the "Pipes"
-
+boolean debugMode = true; 
 
 struct dataStruct {
-  unsigned long micro_sec;  // to save response times
+  unsigned long count;  // to save response times
   int Xposition;          // The Joystick position values
   int Yposition;
   bool switchOn;          // The Joystick push-down switch
@@ -51,10 +51,10 @@ void setup()
   radio.openWritingPipe(addresses[1]);
   radio.openReadingPipe(1, addresses[0]);
 
-  // Start the radio listening for data
-  radio.startListening();
+  radio.startListening();   // Start the radio listening for data
 //  radio.printDetails(); //Uncomment to show LOTS of debugging information
-  Serial.println("RoboCAP Rx Test Started...");
+  delay(100);
+  Serial.println(F("RoboCAP Rx Test Started..."));
 }
 
 
@@ -64,32 +64,32 @@ void loop()
     while (radio.available())   // While there is data ready to be retrieved from the receive pipe
     {
       radio.read( &myData, sizeof(myData) );             // Get the data
-    } 
-
-    radio.stopListening();                               // First, stop listening so we can transmit
-    radio.write( &myData, sizeof(myData) );              // Send the received data back.
-    radio.startListening();                              // Now, resume listening so we catch the next packets.
-
-   // Serial.print(F("Packet Received - Sent response "));  // Print the received packet data
-   // Serial.print(myData.micro_sec);
-   // Serial.println(F("uS"));
-    
-    Serial.print("X: ");
+    }    
+   if(debugMode == true){
+    Serial.print(F("Count: "));
+    Serial.print(myData.count);
+    Serial.print(F(" X: "));
     Serial.print(myData.Xposition);
-    Serial.print(", Y: ");
+    Serial.print(F(" Y: "));
     Serial.print(myData.Yposition);
-    Serial.print(" ,SW: ");
+    Serial.print(F(" SW: "));
     Serial.print(myData.switchOn);
-    Serial.print(" ,A6: ");
+    Serial.print(F(" A6: "));
     Serial.print(myData.TL_BTN);
-    Serial.print(" , D3: ");
+    Serial.print(F(" D3: "));
     Serial.print(myData.TR_BTN);
-    Serial.print(" , D4: ");
+    Serial.print(F(" D4: "));
     Serial.print(myData.BL_BTN);
-    Serial.print(" , D5: ");
+    Serial.print(F(" D5: "));
     Serial.println(myData.BR_BTN);
+  }
 
-  } // END radio available
- 
+    
+//    radio.stopListening();                               // First, stop listening so we can transmit
+//    radio.write( &myData, sizeof(myData) );              // Send the received data back.
+//    radio.startListening();  
+
+  }
+                       
 }//--(end main loop )---
 

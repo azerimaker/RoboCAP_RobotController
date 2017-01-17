@@ -5,7 +5,8 @@
  * [az]/([en])
  * Arduino Sketch: Controller (Tx) Test proqrami
  * Kommunikasiya (Communication methods): nRF24L01+ / Smartphone + Bluetooth (HC-06)
- * Son modifikasia (last modified): 1 Dekabr 2016
+ * Son modifikasia (last modified): 17.01.2017
+ * Melumat paketi gonderilme tezliyi: -70 Hz
  * ----------------------------------------------------------------------------
  * 
 */
@@ -28,19 +29,6 @@
 #define BOTTOM_LEFT_BTN 4
 #define BOTTOM_RIGHT_BTN 5
 
-// Nokia 5110 LCD (84x48)
-#define RST 6
-#define CE 7
-#define DC 9
-#define DIN 11
-#define CLK 13
-
-/*---------------------LCD Test -------------------------------------------------------*/
-void LcdWriteCmd(byte cmd); 
-void LcdWriteData(byte data);
-void LcdInit(void);
-void LcdTest(void);
-void LcdClear(void);
 
 /*-----( Declare objects )-----*/
 /* Hardware configuration: Set up nRF24L01 radio on SPI bus plus (usually) pins 7 & 8 (Can be changed) */
@@ -52,11 +40,11 @@ byte addresses[][6] = {"1Node", "2Node"}; // These will be the names of the "Pip
 unsigned long timeNow;  // Used to grab the current time, calculate delays
 unsigned long started_waiting_at;
 boolean timeout;       // Timeout? True or False
-boolean debugMode = false; 
-
+boolean debugMode = true; 
+unsigned long counter = 0;
 
 struct dataStruct {
-  unsigned long micro_sec;  // to save response times
+  unsigned long count;  // to save response times
   int Xposition;          // The Joystick position values
   int Yposition;
   bool switchOn;          // The Joystick push-down switch
@@ -77,13 +65,6 @@ void setup()
   pinMode(BOTTOM_LEFT_BTN, INPUT_PULLUP);
   pinMode(BOTTOM_RIGHT_BTN, INPUT_PULLUP);
 
-  
-  LcdInit();
-  LcdClear();
-  LcdTest();
-  delay(3000);
-  LcdClear();
-
   radio.begin();          // Initialize the nRF24L01 Radio
   radio.setChannel(108);  // Above most WiFi frequencies
   radio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
@@ -96,15 +77,18 @@ void setup()
   // Open a writing and reading pipe on each radio, with opposite addresses
   radio.openWritingPipe(addresses[0]);  // Oturucu Pipe (kanali) ishe sal
   radio.openReadingPipe(1, addresses[1]); // Qebul Pipe (kanali) ishe sal
-  radio.startListening();
+//  radio.startListening();
 
 //  radio.printDetails(); //Uncomment to show LOTS of debugging information
+  
+  delay(100);
+  Serial.println(F("RoboCAP Tx Test Started..."));
 }//--(end setup )---
 
 
 void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 {
-	radio.stopListening();                                    // First, stop listening so we can talk.
+//	radio.stopListening();                                    // First, stop listening so we can talk.
 
 	/*********************( Read Controller Buttons and Joystick )***********************/
 	myData.Xposition = analogRead(JOYSTICK_X);
@@ -118,154 +102,36 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 	myData.TR_BTN = !digitalRead(TOP_RIGT_BTN);
 	myData.BL_BTN = !digitalRead(BOTTOM_LEFT_BTN);
 	myData.BR_BTN = !digitalRead(BOTTOM_RIGHT_BTN);
-	myData.micro_sec = micros();  // Send back for timing
+	myData.count = counter++;  
 
+  if(!radio.write( &myData, sizeof(myData) )) {  // Send data, checking for error ("!" means NOT)
+    Serial.println(F("Transmit failed "));
+  }
+  
 	/*********************(Print ALL if debugMode == true)********************/
-	if(debugMode){
-		Serial.print("X: ");
+	if(debugMode == true){
+    Serial.print(F("Count: "));
+    Serial.print(myData.count);
+		Serial.print(F(" X: "));
 		Serial.print(myData.Xposition);
-		Serial.print(", Y: ");
+		Serial.print(F(" Y: "));
 		Serial.print(myData.Yposition);
-		Serial.print(" ,SW: ");
+		Serial.print(F(" SW: "));
 		Serial.print(myData.switchOn);
-		Serial.print(" ,A6: ");
+		Serial.print(F(" A6: "));
 		Serial.print(myData.TL_BTN);
-		Serial.print(" , D3: ");
+		Serial.print(F(" D3: "));
 		Serial.print(myData.TR_BTN);
-		Serial.print(" , D4: ");
+		Serial.print(F(" D4: "));
 		Serial.print(myData.BL_BTN);
-		Serial.print(" , D5: ");
+		Serial.print(F(" D5: "));
 		Serial.println(myData.BR_BTN);
 	}
 
-	Serial.print(F("Now sending  -  "));
-
-	if(!radio.write( &myData, sizeof(myData) )) {            // Send data, checking for error ("!" means NOT)
-		Serial.println(F("Transmit failed "));
-	}
-
-	radio.startListening();                                    // Now, continue listening
-
- 	started_waiting_at = micros();               // timeout period, get the current microseconds
-	timeout = false;                            //  variable to indicate if a response was received or not
-
-	while ( !radio.available() ){                            // While nothing is received
-		if (micros() - started_waiting_at > 200000 ){           // If waited longer than 200ms, indicate timeout and exit while loop
-			timeout = true;
-			break;
-	  	}
-	}
-
-  if ( timeout ){ // Describe the results
-    Serial.println(F("Response timed out -  no Acknowledge.")); // passing flash-memory based strings to save SRAM
-  }else
-  {
-    // Grab the response, compare, and send to Serial Monitor
-    radio.read( &myData, sizeof(myData) );
-    timeNow = micros();
-
-    Serial.print(F("Sent "));
-    Serial.print(timeNow);
-    Serial.print(F(", Got response "));
-    Serial.print(myData.micro_sec);
-    Serial.print(F(", Round-trip delay "));
-    Serial.print(timeNow - myData.micro_sec);
-    Serial.println(F(" microseconds "));
-  }
+	//radio.startListening();                                    // Now, continue listening
+  //radio.read( &myData, sizeof(myData) );
   delay(10);
 }
-
-
-
-void LcdInit(void)
-{
-  pinMode(RST, OUTPUT);
-  pinMode(CE, OUTPUT);
-  pinMode(DC, OUTPUT);
-  pinMode(DIN, OUTPUT);
-  pinMode(CLK, OUTPUT);
-  digitalWrite(RST, LOW);   // active low
-  digitalWrite(RST, HIGH); 
-}
-
-
-void LcdTest(void)
-{
-  digitalWrite(DC, LOW); //DC pin is low for commands
-  LcdWriteCmd(0x21); // LCD extended commands
-  LcdWriteCmd(0xB8); // set LCD Vop (contrast)
-  //LcdWriteCmd(0x20); // LCD normal commands
-  LcdWriteCmd(0x04); // set temp coefficent
-  LcdWriteCmd(0x14); // LCD bias mode 1:40
-  LcdWriteCmd(0x20); // LCD basic commands
-  LcdWriteCmd(0x09); // LCD all segments on
-  LcdWriteCmd(0x0C); // display control set, normal video mode
-  
-  for(int i = 0; i < 42; i++)
-  {
-      LcdWriteData(0xAA); // AA, 55
-      delay(50);
-      LcdWriteData(0x55);
-  }
-  for(int i = 0; i < 42; i++)
-  {
-      LcdWriteData(0xFF); 
-      delay(50);
-      LcdWriteData(0x00);
-  }
-  for(int i = 0; i < 42; i++)
-  {
-      LcdWriteData(0xAA); // AA, 55
-      delay(50);
-      LcdWriteData(0x55);
-  }
-  for(int i = 0; i < 42; i++)
-  {
-      LcdWriteData(0xFF); 
-      delay(50);
-      LcdWriteData(0x00);
-  }
-  for(int i = 0; i < 42; i++)
-  {
-      LcdWriteData(0xAA); 
-      delay(50);
-      LcdWriteData(0x55);
-  }
-  
-  for(int i = 0; i < 42; i++)
-  {
-      LcdWriteData(0xFF); 
-      delay(50);
-      LcdWriteData(0x00);
-  }
-}
-
-
-void LcdClear(void)
-{
-  for (int index = 0; index < 84 * 48 / 8; index++)
-  {
-    LcdWriteData(0x00);
-  }
-}
-
-
-void LcdWriteCmd(byte cmd)
-{
-digitalWrite(DC, LOW); //DC pin is low for commands
-digitalWrite(CE, LOW); // active low
-shiftOut(DIN, CLK, MSBFIRST, cmd); //transmit serial data
-digitalWrite(CE, HIGH);
-}
-
-void LcdWriteData(byte data)
-{
-digitalWrite(DC, HIGH);     //DC pin is high for data
-digitalWrite(CE, LOW);      // active low
-shiftOut(DIN, CLK, MSBFIRST, data); //transmit serial data
-digitalWrite(CE, HIGH);
-}
-
 
 
 
