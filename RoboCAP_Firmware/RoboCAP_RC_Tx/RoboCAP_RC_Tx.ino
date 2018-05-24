@@ -13,8 +13,8 @@
 #define CE_PIN   8
 #define CSN_PIN 10
 // Joystick
-#define JOYSTICK_X   A1  // Joystick VRx Analoq pin A0-a baglanir
-#define JOYSTICK_Y   A0  // Joystick VRy Analoq pin A1-e baglanir
+#define JOYSTICK_X   A0  // Joystick VRx Analoq pin A0-a baglanir
+#define JOYSTICK_Y   A1  // Joystick VRy Analoq pin A1-e baglanir
 #define JOYSTICK_SW  A2  //  Joystick merkeze basildiqda achar
 // Buttons
 #define TOP_LEFT_BTN A6
@@ -57,15 +57,16 @@ struct dataStruct {
   bool TR_BTN;
   bool BL_BTN;
   bool BR_BTN;
+  int robot_Vbat;
 } myData;                 
 
 
  /****** SETUP: Bir defe icra olunacaq ******/
 void setup()  
 {
-  Serial.begin(115200);
-  pinMode(JOYSTICK_SW, INPUT_PULLUP);  // Kenar rezistor ishletmeye ehtiyac yoxdu
-                                      //  daxili Pull-up rezistorunu ishe saliriq
+  Serial.begin(9600);
+  		 								//  daxili Pull-up rezistorunu ishe saliriq
+  pinMode(JOYSTICK_SW, INPUT_PULLUP);  // Kenar rezistor ishletmeye ehtiyac yoxdu                             
   pinMode(TOP_LEFT_BTN, INPUT); // Analog pin oldughu ucun PULLUP yoxdur
   pinMode(TOP_RIGT_BTN, INPUT_PULLUP);
   pinMode(BOTTOM_LEFT_BTN, INPUT_PULLUP);
@@ -96,6 +97,10 @@ void loop()
   /*********************( Read Controller Buttons and Joystick )***********************/
   X_qiymeti = analogRead(JOYSTICK_X);
   Y_qiymeti = analogRead(JOYSTICK_Y);
+
+  myData.Xposition = X_qiymeti; // Filter olunmamish qiymetler
+  myData.Yposition = Y_qiymeti;
+
   myData.switchOn  = !digitalRead(JOYSTICK_SW);  // Achar basildiqda 0V oldughu ucun, inversiya etmeliyik
 
   int A6_value = analogRead(TOP_LEFT_BTN); // A6 Analog IN only
@@ -114,11 +119,13 @@ void loop()
  * tesir edecek, neticede sert kecidler, yumshaq olacaq
  * 
  */
-  X_exp_cem = (X_exp_emsal * X_qiymeti) + ((1-X_exp_emsal)*X_exp_cem); // Exponensial filterleme emeliyyati
-  Y_exp_cem = (Y_exp_emsal * Y_qiymeti) + ((1-Y_exp_emsal)*Y_exp_cem); 
+
+
+//  X_exp_cem = (X_exp_emsal * X_qiymeti) + ((1-X_exp_emsal)*X_exp_cem); // Exponensial filterleme emeliyyati
+//  Y_exp_cem = (Y_exp_emsal * Y_qiymeti) + ((1-Y_exp_emsal)*Y_exp_cem); 
         
-  myData.Xposition = X_exp_cem; // Filter olunmush qiymetleri umumi struktura yaz
-  myData.Yposition = Y_exp_cem;
+//  myData.Xposition = X_exp_cem; // Filter olunmush qiymetleri umumi struktura yaz
+//  myData.Yposition = Y_exp_cem;
 
   // Bu Serial Print-leri komment ede bilersiniz. 
   Serial.print("Indi gonderilir, X= ");
@@ -127,17 +134,17 @@ void loop()
   Serial.print(myData.Yposition);
   if ( myData.switchOn == 1)
   {
-      Serial.println(", Achar ON");
+      Serial.println(", ON");
   }else
   {
-      Serial.println(", Achar OFF");
+      Serial.println(", OFF");
   }
 
   if(!radio.write( &myData, sizeof(myData) )) {  // Melumati gonder ve xeta olarsa print
      Serial.println("Gonderilme ugursuz oldu");
   }
 
-  radio.startListening();                                    // Now, continue listening
+  radio.startListening();                      // Now, continue listening
   started_waiting_at = micros();               // timeout period, get the current microseconds
   timeout = false;                            //  variable to indicate if a response was received or not
 
@@ -155,7 +162,7 @@ void loop()
     // Grab the response, compare, and send to Serial Monitor
     radio.read( &myData, sizeof(myData) );
     timeNow = micros();
-
+/*
     Serial.print(F("Sent "));
     Serial.print(timeNow);
     Serial.print(F(", Got response "));
@@ -163,10 +170,10 @@ void loop()
     Serial.print(F(", Round-trip delay "));
     Serial.print(timeNow - myData.micro_sec);
     Serial.println(F(" microseconds "));
-
+*/
   }
   
-  delay(50); // Delay olmasi stabilliyi artirir. 
+  delay(10); // Delay olmasi stabilliyi artirir. 
   
 
 } /****** LOOP sonu ******/

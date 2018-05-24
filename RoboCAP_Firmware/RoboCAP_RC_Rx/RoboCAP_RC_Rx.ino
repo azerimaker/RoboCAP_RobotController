@@ -32,13 +32,16 @@
 #define motor2B 3     // IND
 #define ENB A3		  // Motor B Enable
 
+#define VBAT A0      // Batareya gerginliyi
+#define V_Divider_Coeff 0.01801F // gerginlik bolucuden alinir
+
 // HC-06 Bluetooth Modul pinleri
 //#define Rx 4          // -> HC-06 TxD    
 //#define Tx 7 		  // -> HC-06 RxD
 
-#define X_min 470
+#define X_min 480
 #define X_max 530
-#define Y_min 470
+#define Y_min 480
 #define Y_max 530
 
  // deyishenlar ve sabitler
@@ -57,10 +60,11 @@ void driveRobot(char DIRECTION, unsigned char SPEED);
 void setSpeedRight(unsigned char SPEED, boolean DIR);
 void setSpeedLeft(unsigned char SPEED, boolean DIR);
 void motorTormozla(void);
+int  readBatteryVoltage(void);
 
 /*-----( Deyishenler )-----*/
 byte addresses[][6] = {"1Node", "2Node"}; //  nRF ucun "Pipe" adlari
-
+byte failsafe_count = 0; 
 
 struct dataStruct {
   unsigned long micro_sec;  // to save response times
@@ -71,8 +75,8 @@ struct dataStruct {
   bool TR_BTN;
   bool BL_BTN;
   bool BR_BTN;
-} myData;                 
-               
+  int robot_Vbat;
+} myData;  
 
 char Joystick_Dir;     // Joystick kordinatlarini hereket istiqametine ve 
 unsigned char Joystick_Speed = 0;   // surete cevirmek
@@ -85,7 +89,7 @@ boolean BACKWARD = false; // geri
 /****** SETUP: Bir defe icra olunacaq ******/                       
 void setup() 
 {
-  Serial.begin(115200);
+  Serial.begin(9600);
   
   pinMode(motor1A, OUTPUT);
   pinMode(motor1B, OUTPUT);
@@ -118,37 +122,45 @@ void setup()
 
  /****** LOOP: Daimi tekrarlanir ******/
 void loop()
-{
-   if ( radio.available()){		
-    while (radio.available())   // Qebul Pipe-da melumat olarsa
-    {
-      radio.read( &myData, sizeof(myData) ); // melumati oxu
-    }
-    //failsafe_count = 0; 
-    radio.stopListening();                               // First, stop listening so we can transmit
-    radio.write( &myData, sizeof(myData) );              // Send the received data back.
-    radio.startListening();                              // Now, resume listening so we catch the next packets.
-    Serial.print("X: ");
-    Serial.print(myData.Xposition);
-    Serial.print(", Y: ");
-    Serial.print(myData.Yposition);
-    Serial.print(" ,SW: ");
-    Serial.print(myData.switchOn);
-    Serial.print(" ,A6: ");
-    Serial.print(myData.TL_BTN);
-    Serial.print(" , D3: ");
-    Serial.print(myData.TR_BTN);
-    Serial.print(" , D4: ");
-    Serial.print(myData.BL_BTN);
-    Serial.print(" , D5: ");
-    Serial.println(myData.BR_BTN);
+{ 
+    if ( radio.available() )
+    {		
+      while ( radio.available() )   // Qebul Pipe-da melumat olarsa
+      {
+        radio.read( &myData, sizeof(myData) ); // Radio melumati oxu
+      }
+      
+      radio.stopListening();  
+        myData.robot_Vbat =  readBatteryVoltage();           // Batareya gerginliyini elave et                        // First, stop listening so we can transmit
+        radio.write( &myData, sizeof(myData) );              // Send the received data back.
+      radio.startListening();                              // Now, resume listening so we catch the next packets.
+      
 
-    // Yeni qebul olunmush melumati robotun hereket sxemine uyghunlashdir
-    calcDirection(myData.Xposition, myData.Yposition); // S,F,B,L,R,I,G,H,J
-    calcSpeed(myData.Xposition, myData.Yposition);  // 0-255
-    driveRobot(Joystick_Dir, Joystick_Speed); 
-  }  // END radio available
-  
+      // Yeni qebul olunmush melumati robotun hereket sxemine uyghunlashdir
+      calcDirection(myData.Xposition, myData.Yposition); // S,F,B,L,R,I,G,H,J
+      calcSpeed(myData.Xposition, myData.Yposition);  // 0-255
+      driveRobot(Joystick_Dir, Joystick_Speed);
+
+      Serial.print("X:"); Serial.print(myData.Xposition);
+      Serial.print(" Y:"); Serial.print(myData.Yposition);
+      Serial.print(" SW:"); Serial.print(myData.switchOn);
+      Serial.print(" A6:"); Serial.print(myData.TL_BTN); 
+      Serial.print(" D3:"); Serial.print(myData.TR_BTN);
+      Serial.print(" D4:"); Serial.print(myData.BL_BTN);
+      Serial.print(" D5:"); Serial.print(myData.BR_BTN);
+      Serial.print(" vBat:"); Serial.print(myData.robot_Vbat);
+      Serial.print(" Dir:"); Serial.print(Joystick_Dir);
+      Serial.print(" Speed:"); Serial.println(Joystick_Speed);
+
+    }else{
+      failsafe_count++; 
+      if(failsafe_count>10){
+        failsafe_count=0;
+        motorTormozla();
+      }
+    }
+    delay(20);
+
 }  /****** LOOP sonu ******/
 
  /*
@@ -158,35 +170,35 @@ void loop()
 
  void calcDirection(int X_pos, int Y_pos){
   
-  if(X_pos >= X_min && X_pos <= X_max && Y_pos > Y_max)
+  if((X_pos >= X_min && X_pos <= X_max) && Y_pos >= Y_max)
   {
     Joystick_Dir = 'F';
   }
-  else if(X_pos >= X_min && X_pos <= X_max && Y_pos < Y_min)
+  else if(X_pos >= X_min && X_pos <= X_max && Y_pos <= Y_min)
   {
     Joystick_Dir = 'B';
   }
-  else if(Y_pos >= Y_min && Y_pos <= Y_max && X_pos < X_min)
+  else if(Y_pos >= Y_min && Y_pos <= Y_max && X_pos >= X_max)
   {
     Joystick_Dir = 'L';
   }
-  else if(Y_pos >= Y_min && Y_pos <= Y_max && X_pos > X_max)
+  else if(Y_pos >= Y_min && Y_pos <= Y_max && X_pos <= X_min)
   {
     Joystick_Dir = 'R';
   }
-  else if(X_pos > X_max && Y_pos > Y_max)
+  else if(X_pos <= X_min && Y_pos >= Y_max)
   {
     Joystick_Dir = 'I';
   }
-  else if(X_pos < X_min && Y_pos > Y_max)
+  else if(X_pos >= X_max && Y_pos >= Y_max)
   {
     Joystick_Dir = 'G';
   }
-  else if(X_pos < X_min && Y_pos < Y_min)
+  else if(X_pos >= X_max && Y_pos <= Y_min)
   {
     Joystick_Dir = 'H';
   }
-  else if(X_pos > X_max && Y_pos < Y_min)
+  else if(X_pos <= X_min && Y_pos <= Y_min)
   {
     Joystick_Dir = 'J';
   }
@@ -204,8 +216,8 @@ void loop()
 
  void calcSpeed(int X_pos, int Y_pos){
 
-  X_map = map(X_pos, 0, 1023, -100, 100); // intervali kicilt
-  Y_map = map(Y_pos, 0, 1023, -100, 100);
+  X_map = map(X_pos, 0, 1023, -255, 255); // intervali deyish
+  Y_map = map(Y_pos, 0, 1023, -255, 255);
   
   X_map = abs(X_map); // musbet edede cevir
   Y_map = abs(Y_map);
@@ -214,8 +226,8 @@ void loop()
   Y_sq = sq(Y_map);
 
   Joystick_Speed = (unsigned char)sqrt(X_sq + Y_sq); // Joystick suret vektorunu hesabla, Pifaqor teoremi :)
-  if(Joystick_Speed>100){
-    Joystick_Speed = 100;
+  if(Joystick_Speed>255){
+    Joystick_Speed = 255;
   }
 }
 
@@ -228,41 +240,42 @@ void loop()
 void driveRobot(char DIRECTION, unsigned char SPEED)
 { 
   
-  byte SET_SPEED = map(SPEED, 0,100, 0, MAX_SPEED);// SPEED 0-100, intervali deyish 0-255
-  byte SPEED_MIX = SET_SPEED/2;
+  byte speed = map(SPEED, 0, MAX_SPEED, 0, 255);// SPEED 0-100, intervali deyish 0-255
+  byte speed_div2 = speed/2;
+  byte speed_div4 = speed/4;
   
   switch(DIRECTION){
-      case 'F': // Forward
-          setSpeedRight(SET_SPEED, FORWARD);
-          setSpeedLeft( SET_SPEED, FORWARD);
+      case 'F': // Forward - Ireli
+          setSpeedRight(speed, FORWARD);
+          setSpeedLeft( speed, FORWARD);
           break;
-      case 'B': // Backward
-          setSpeedRight(SET_SPEED, BACKWARD);
-          setSpeedLeft( SET_SPEED, BACKWARD);
+      case 'B': // Backward - Geri
+          setSpeedRight(speed, BACKWARD);
+          setSpeedLeft( speed, BACKWARD);
           break;
-      case 'R': // Right
-          setSpeedRight(SPEED_MIX, FORWARD);
-          setSpeedLeft( SPEED_MIX, BACKWARD);
+      case 'L': // Left - Sola
+          setSpeedRight(speed_div4, FORWARD);
+          setSpeedLeft( speed_div4, BACKWARD);
           break;
-      case 'L': // Left
-          setSpeedRight(SPEED_MIX, BACKWARD);
-          setSpeedLeft( SPEED_MIX, FORWARD);
+      case 'R': // Right - Sagha
+          setSpeedRight(speed_div4, BACKWARD);
+          setSpeedLeft( speed_div4, FORWARD);
           break;
-      case 'I': // Right + Forward
-          setSpeedRight(SET_SPEED, FORWARD);
-          setSpeedLeft( SPEED_MIX, FORWARD);
-            break;
       case 'G': // Left + Forward
-          setSpeedRight(SPEED_MIX, FORWARD);
-          setSpeedLeft( SET_SPEED, FORWARD);
+          setSpeedRight(speed, FORWARD);
+          setSpeedLeft( speed_div2, FORWARD);
+            break;
+      case 'I': // Right + Forward
+          setSpeedRight(speed_div2, FORWARD);
+          setSpeedLeft( speed, FORWARD);
           break;
-      case 'J': // Right + Backward
-          setSpeedRight(SET_SPEED, BACKWARD);
-          setSpeedLeft( SPEED_MIX, BACKWARD);
+      case 'H': // Left + Backward
+          setSpeedRight(speed, BACKWARD);
+          setSpeedLeft( speed_div2, BACKWARD);
           break;  
-      case 'H': // Left + Backward 
-          setSpeedRight(SPEED_MIX, BACKWARD);
-          setSpeedLeft( SET_SPEED, BACKWARD);
+      case 'J': // Right + Backward 
+          setSpeedRight(speed_div2, BACKWARD);
+          setSpeedLeft( speed, BACKWARD);
           break; 
       default: 
             motorTormozla(); // istenilen bashqa simvol olduqda tekerleri tormozla
@@ -292,12 +305,13 @@ void setSpeedRight(unsigned char SPEED, boolean DIR)
 void setSpeedLeft(byte SPEED, boolean DIR)
 {
   if(DIR == true){
-      digitalWrite(motor1A, LOW);
-      analogWrite (motor1B, SPEED);
+      analogWrite(motor1A, SPEED);
+      digitalWrite(motor1B, LOW);  
   }
   else{
-      analogWrite(motor1A, SPEED);
-      digitalWrite(motor1B, LOW);   
+       
+      digitalWrite(motor1A, LOW);
+      analogWrite (motor1B, SPEED);
   }
   
 }
@@ -311,3 +325,8 @@ void motorTormozla(void)
 }
 
 
+int  readBatteryVoltage(void){
+  int voltage = 1000 * V_Divider_Coeff * analogRead(VBAT); // convert raw analog to mV
+  //TODO: convert raw ADC reading to mV 
+  return voltage; // milliVolt
+}
